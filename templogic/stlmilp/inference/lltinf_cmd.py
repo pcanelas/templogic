@@ -83,11 +83,11 @@ def cv_test(matfile, depth=3, out_perm=None, verbose=False):
 
 
 # Learning wrapper
-def lltinf_learn(depth, disp=False):
+def lltinf_learn(depth, tree=None, disp=False):
     lltinf = LLTInf(depth=depth, log=disp, stop_condition=[perfect_stop, depth_stop])
 
     def learn(data):
-        return lltinf.fit(Traces(*zip(*data)), disp=disp)
+        return lltinf.fit(Traces(*zip(*data)), tree=tree, disp=disp)
 
     return learn
 

@@ -324,9 +324,9 @@ class LLTInf(object):
             self.pool.terminate()
             self.pool.join()
 
-    def fit(self, traces, disp=False):
+    def fit(self, traces, tree=None, disp=False):
         np.seterr(all="ignore")
-        self.tree = self._lltinf(traces, None, self.depth, disp=disp)
+        self.tree = self._lltinf(traces, None, self.depth, disp=disp, tree=tree)
         return self
 
     def fit_partial(self, traces, disp=False):
@@ -386,7 +386,7 @@ class LLTInf(object):
         if self.log:
             logger.debug(*args)
 
-    def _lltinf(self, traces, rho, depth, disp=False, override_impurity=None):
+    def _lltinf(self, traces, rho, depth, disp=False, override_impurity=None, tree=None):
         """Recursive call for the decision tree construction.
 
         See lltinf for information on similar arguments.
@@ -400,39 +400,41 @@ class LLTInf(object):
         if any([stop(self, traces, rho, depth) for stop in self.stop_condition]):
             return None
 
-        # Find primitive using impurity measure
-        self._debug(f"Creating primitives at depth {depth} over {len(traces)} traces")
-        primitives = self.primitive_factory(traces.signals, traces.labels)
-        if override_impurity is None:
-            impurity = self.optimize_impurity
-        else:
-            impurity = override_impurity
-        self._debug(
-            f"Finding best primitive at depth {depth} over {len(traces)} traces"
-        )
-        primitive, impurity = _find_best_primitive(
-            traces,
-            primitives,
-            rho,
-            impurity,
-            disp,
-            self.optimizer_args,
-            times=self.times,
-            interpolate=self.interpolate,
-            tinter=self.tinter,
-        )
-        if disp:
-            print("Best: {} ({})".format(primitive, impurity))
-        self._debug(f"Best primitive found: {primitive} (imp: {impurity})")
+        if tree is None:
+            # Find primitive using impurity measure
+            self._debug(f"Creating primitives at depth {depth} over {len(traces)} traces")
+            primitives = self.primitive_factory(traces.signals, traces.labels)
+            if override_impurity is None:
+                impurity = self.optimize_impurity
+            else:
+                impurity = override_impurity
+            self._debug(
+                f"Finding best primitive at depth {depth} over {len(traces)} traces"
+            )
+            primitive, impurity = _find_best_primitive(
+                traces,
+                primitives,
+                rho,
+                impurity,
+                disp,
+                self.optimizer_args,
+                times=self.times,
+                interpolate=self.interpolate,
+                tinter=self.tinter,
+            )
+            if disp:
+                print("Best: {} ({})".format(primitive, impurity))
+            self._debug(f"Best primitive found: {primitive} (imp: {impurity})")
 
-        # Classify using best primitive and split into groups
-        prim_rho = [
-            primitive.score(model)
-            for model in traces.models(self.interpolate, self.tinter)
-        ]
-        if rho is None:
-            rho = [np.inf for i in traces.labels]
-        tree = DTree(primitive, traces, rho)
+            # Classify using best primitive and split into groups
+            prim_rho = [
+                primitive.score(model)
+                for model in traces.models(self.interpolate, self.tinter)
+            ]
+            if rho is None:
+                rho = [np.inf for i in traces.labels]
+
+            tree = DTree(primitive, traces, rho)
 
         def split(prim_rho):
             sat, unsat = [], []
